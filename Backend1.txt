@@ -1,0 +1,583 @@
+// COMPLETE UPDATED BACKEND CODE - Replace your entire Backend1.txt with this
+
+// ============================================
+// GAMS Attendance System - Backend
+// ============================================
+
+const SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+
+// ============================================
+// Main Request Handlers
+// ============================================
+
+function doGet(e) {
+  return handleRequest(e);
+}
+
+function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
+  const action = e.parameter.action;
+  
+  try {
+    switch(action) {
+      case 'getClasses':
+        return responseToJSON(getClasses());
+      case 'getTerms':
+        return responseToJSON(getTerms());
+      case 'getAttendance':
+        return responseToJSON(getAttendance(e.parameter));
+      case 'saveAttendance':
+        return responseToJSON(saveAttendance(e.parameter));
+      case 'saveClass':
+        return responseToJSON(saveClass(e.parameter));
+      case 'saveAllClasses':
+        return responseToJSON(saveAllClasses(e.parameter));
+      case 'saveClasses':
+        return responseToJSON(saveClasses(e.parameter));
+      case 'saveTerms':
+        return responseToJSON(saveTerms(e.parameter));
+      case 'getAttendanceStats':
+        return responseToJSON(getAttendanceStats(e.parameter));
+      case 'setupSheets':
+        return responseToJSON(setupSheets());
+      default:
+        return responseToJSON({error: 'Invalid action: ' + action});
+    }
+  } catch (error) {
+    return responseToJSON({error: error.message});
+  }
+}
+
+function responseToJSON(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ======= Attendance helpers & saver (single source of truth) =======
+
+function ensureAttendanceSheetAndHeaders() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Attendance');
+
+  const attendanceHeaders = [
+    'Date',
+    'ClassID',
+    'Term',
+    'Week',
+    'MalesPresent',
+    'FemalesPresent',
+    'TotalPresent',
+    'Timestamp',
+    'Session'
+  ];
+
+  if (!sheet) {
+    sheet = ss.insertSheet('Attendance');
+    sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
+    return sheet;
+  }
+
+  const lastCol = Math.max(sheet.getLastColumn(), attendanceHeaders.length);
+  const existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+
+  let needsReset = false;
+  if (existing.length < attendanceHeaders.length) needsReset = true;
+  else {
+    for (let i = 0; i < attendanceHeaders.length; i++) {
+      if (existing[i] !== attendanceHeaders[i]) {
+        needsReset = true;
+        break;
+      }
+    }
+  }
+
+  if (needsReset) {
+    sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
+    if (lastCol > attendanceHeaders.length) {
+      sheet.getRange(1, attendanceHeaders.length + 1, sheet.getMaxRows(), lastCol - attendanceHeaders.length).clear();
+    }
+  }
+
+  return sheet;
+}
+
+function getSheetByName(name) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+}
+
+function saveAttendanceRecord(params) {
+  try {
+    const sheet = ensureAttendanceSheetAndHeaders();
+
+    const {
+      date,
+      classId,
+      term,
+      week,
+      session,
+      malesPresent,
+      femalesPresent
+    } = params || {};
+
+    if (!date || !classId || !term || (week === undefined || week === null || week === '')) {
+      return { success: false, error: 'Missing required fields: date, classId, term, week' };
+    }
+
+    const sessionValue = (session || 'am').toString().trim().toLowerCase();
+    const males = parseInt(malesPresent || 0, 10) || 0;
+    const females = parseInt(femalesPresent || 0, 10) || 0;
+    const totalPresent = males + females;
+    const timestamp = (new Date()).toISOString();
+
+    let classObj = null;
+    if (typeof getClassById === 'function') {
+      try { classObj = getClassById(classId); } catch (e) { classObj = null; }
+      if (classObj) {
+        if (classObj.TotalMales !== undefined && !isNaN(classObj.TotalMales) && males > classObj.TotalMales) {
+          return { success: false, error: `Males present (${males}) exceeds total males in class (${classObj.TotalMales})` };
+        }
+        if (classObj.TotalFemales !== undefined && !isNaN(classObj.TotalFemales) && females > classObj.TotalFemales) {
+          return { success: false, error: `Females present (${females}) exceeds total females in class (${classObj.TotalFemales})` };
+        }
+      }
+    }
+
+    const dataRange = sheet.getDataRange();
+    const all = dataRange.getValues();
+    let found = false;
+    let foundRow = -1;
+    for (let r = 1; r < all.length; r++) {
+      const row = all[r];
+      const rowDate = row[0] !== undefined && row[0] !== null ? row[0].toString() : '';
+      const rowClassId = row[1] !== undefined && row[1] !== null ? row[1].toString() : '';
+      const rowSession = row[8] !== undefined && row[8] !== null ? row[8].toString().toLowerCase() : '';
+
+      if (rowDate == date.toString() && rowClassId == classId.toString() && rowSession == sessionValue) {
+        found = true;
+        foundRow = r + 1;
+        break;
+      }
+    }
+
+    const record = [date, classId, term, week, males, females, totalPresent, timestamp, sessionValue];
+
+    if (found) {
+      sheet.getRange(foundRow, 1, 1, record.length).setValues([record]);
+    } else {
+      sheet.appendRow(record);
+    }
+
+    return {
+      success: true,
+      message: 'Attendance saved successfully',
+      record: {
+        Date: date,
+        ClassID: classId,
+        Term: term,
+        Week: week,
+        MalesPresent: males,
+        FemalesPresent: females,
+        TotalPresent: totalPresent,
+        Timestamp: timestamp,
+        Session: sessionValue
+      }
+    };
+
+  } catch (err) {
+    return { success: false, error: err.message || String(err) };
+  }
+}
+
+function saveAttendance(params) {
+  return saveAttendanceRecord(params);
+}
+
+// ============================================
+// Class Service Functions
+// ============================================
+
+function getClasses() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Classes');
+  
+  if (!sheet) {
+    return {
+      success: false,
+      error: 'Classes sheet not found. Please run Initialize Sheets first.'
+    };
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  const classes = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) {
+      classes.push({
+        id: data[i][0].toString(),
+        classCode: data[i][1],
+        yearGroup: data[i][2],
+        totalMales: parseInt(data[i][3]) || 0,
+        totalFemales: parseInt(data[i][4]) || 0,
+        classSize: parseInt(data[i][5]) || 0
+      });
+    }
+  }
+  
+  return {
+    success: true,
+    classes: classes
+  };
+}
+
+function getClassById(classId) {
+  const classes = getDataAsObjects('Classes');
+  return classes.find(c => c.ClassID == classId);
+}
+
+function saveClasses(params) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Classes');
+  
+  if (!sheet) {
+    sheet = ss.insertSheet('Classes');
+    sheet.getRange('A1:G1').setValues([[
+      'ID', 'Class Code', 'Year Group', 'Total Males', 'Total Females', 'Class Size', 'IsActive'
+    ]]);
+    sheet.getRange('A1:G1').setFontWeight('bold');
+  }
+  
+  const classesJSON = params.classes;
+  if (!classesJSON) {
+    return {
+      success: false,
+      error: 'No classes data provided'
+    };
+  }
+  
+  const classes = JSON.parse(classesJSON);
+  
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).clear();
+  }
+  
+  const rows = classes.map(cls => [
+    cls.id,
+    cls.classCode,
+    cls.yearGroup,
+    cls.totalMales,
+    cls.totalFemales,
+    cls.classSize,
+    cls.isActive !== undefined ? cls.isActive : true
+  ]);
+  
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, 7).setValues(rows);
+  }
+  
+  return {
+    success: true,
+    message: `${classes.length} classes saved successfully`
+  };
+}
+
+function saveAllClasses(params) {
+  try {
+    const classes = JSON.parse(params.classes);
+    
+    if (!classes || classes.length === 0) {
+      return {error: 'No classes provided'};
+    }
+    
+    const sheet = getSheetByName('Classes');
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clear();
+    }
+
+    const records = classes.map(cls => [
+      cls.id,
+      cls.classCode,
+      cls.yearGroup,
+      cls.totalMales,
+      cls.totalFemales,
+      cls.classSize,
+      true
+    ]);
+    
+    if (records.length > 0) {
+      sheet.getRange(2, 1, records.length, records[0].length).setValues(records);
+    }
+    
+    return {
+      success: true,
+      message: `${classes.length} classes saved successfully`
+    };
+  } catch (error) {
+    return {error: error.message};
+  }
+}
+
+// ============================================
+// Terms Service Functions
+// ============================================
+
+function getTerms() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Terms');
+  
+  if (!sheet) {
+    return {
+      success: false,
+      error: 'Terms sheet not found.'
+    };
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  const terms = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) {
+      terms.push({
+        id: data[i][0],
+        name: data[i][1],
+        startDate: data[i][2],
+        endDate: data[i][3],
+        weeks: parseInt(data[i][4]) || 0,
+        isActive: data[i][5]
+      });
+    }
+  }
+  
+  return {
+    success: true,
+    terms: terms
+  };
+}
+
+function saveTerms(params) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Terms');
+  
+  if (!sheet) {
+    sheet = ss.insertSheet('Terms');
+    sheet.getRange('A1:F1').setValues([[
+      'TermID', 'Name', 'StartDate', 'EndDate', 'Weeks', 'IsActive'
+    ]]);
+    sheet.getRange('A1:F1').setFontWeight('bold');
+  }
+  
+  const termsJSON = params.terms;
+  if (!termsJSON) {
+    return {
+      success: false,
+      error: 'No terms data provided'
+    };
+  }
+  
+  const terms = JSON.parse(termsJSON);
+  
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).clear();
+  }
+  
+  const rows = terms.map(term => [
+    term.id,
+    term.name,
+    term.startDate,
+    term.endDate,
+    term.weeks,
+    term.isActive
+  ]);
+  
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+  }
+  
+  return {
+    success: true,
+    message: `${terms.length} terms saved successfully`
+  };
+}
+
+// ============================================
+// Sheet Service Functions
+// ============================================
+
+function getDataAsObjects(sheetName) {
+  const sheet = getSheetByName(sheetName);
+  if (!sheet) {
+    throw new Error(`Sheet '${sheetName}' not found`);
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) {
+    return [];
+  }
+  
+  const headers = data[0];
+  return data.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header] = row[index];
+    });
+    return obj;
+  });
+}
+
+function appendToSheet(sheetName, rowData) {
+  const sheet = getSheetByName(sheetName);
+  sheet.appendRow(rowData);
+  return rowData;
+}
+
+// ============================================
+// Report Service Functions
+// ============================================
+
+function getAttendanceStats(params) {
+  try {
+    const { classId, term } = params;
+    
+    if (!classId || !term) {
+      return {success: false, error: 'Class ID and Term are required'};
+    }
+    
+    const classObj = getClassById(classId);
+    if (!classObj) {
+      return {success: false, error: 'Class not found'};
+    }
+    
+    const attendance = getDataAsObjects('Attendance');
+    const termAttendance = attendance.filter(record => 
+      record.ClassID == classId && record.Term == term
+    );
+    
+    const totalMales = classObj.TotalMales || 0;
+    const totalFemales = classObj.TotalFemales || 0;
+    const classSize = classObj.ClassSize || 0;
+    
+    let totalMalesPresent = 0;
+    let totalFemalesPresent = 0;
+    let totalDays = termAttendance.length;
+    
+    termAttendance.forEach(record => {
+      totalMalesPresent += parseInt(record.MalesPresent || 0);
+      totalFemalesPresent += parseInt(record.FemalesPresent || 0);
+    });
+    
+    const avgMalesPresent = totalDays > 0 ? (totalMalesPresent / totalDays) : 0;
+    const avgFemalesPresent = totalDays > 0 ? (totalFemalesPresent / totalDays) : 0;
+    const avgTotalPresent = totalDays > 0 ? ((totalMalesPresent + totalFemalesPresent) / totalDays) : 0;
+    
+    const maleAttendanceRate = totalMales > 0 ? (avgMalesPresent / totalMales) * 100 : 0;
+    const femaleAttendanceRate = totalFemales > 0 ? (avgFemalesPresent / totalFemales) * 100 : 0;
+    const overallAttendanceRate = classSize > 0 ? (avgTotalPresent / classSize) * 100 : 0;
+    
+    return {
+      success: true,
+      class: classObj,
+      statistics: {
+        totalDays: totalDays,
+        totalMalesPresent: totalMalesPresent,
+        totalFemalesPresent: totalFemalesPresent,
+        avgMalesPresent: Math.round(avgMalesPresent * 100) / 100,
+        avgFemalesPresent: Math.round(avgFemalesPresent * 100) / 100,
+        avgTotalPresent: Math.round(avgTotalPresent * 100) / 100,
+        maleAttendanceRate: Math.round(maleAttendanceRate * 100) / 100,
+        femaleAttendanceRate: Math.round(femaleAttendanceRate * 100) / 100,
+        overallAttendanceRate: Math.round(overallAttendanceRate * 100) / 100
+      },
+      attendanceRecords: termAttendance.length
+    };
+  } catch (error) {
+    return {success: false, error: error.message};
+  }
+}
+
+// ============================================
+// Setup Service Functions
+// ============================================
+
+function setupSheets() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Create or reset Classes sheet
+    let sheet = ss.getSheetByName('Classes');
+    if (sheet) {
+      ss.deleteSheet(sheet);
+    }
+    sheet = ss.insertSheet('Classes');
+    
+    const classHeaders = ['ClassID', 'ClassCode', 'YearGroup', 'TotalMales', 'TotalFemales', 'ClassSize', 'IsActive'];
+    sheet.getRange(1, 1, 1, classHeaders.length).setValues([classHeaders]);
+    
+    const sampleClasses = [
+      [1, '1GRAN', '1st Years', 16, 0, 16, true],
+      [2, '1TLEY', '1st Years', 16, 0, 16, true],
+      [3, '2GRA', '2nd Years', 0, 10, 10, true],
+      [4, '2NT', '2nd Years', 0, 8, 8, true],
+      [5, '2LEY', '2nd Years', 15, 0, 15, true],
+      [6, '3GR', '3rd Years', 8, 11, 19, true],
+      [7, '3AN', '3rd Years', 9, 9, 18, true],
+      [8, '3TL', '3rd Years', 8, 8, 16, true],
+      [9, '3EY', '3rd Years', 14, 11, 25, true],
+      [10, '4GR', '4th Years', 7, 9, 16, true],
+      [11, '4A', '4th Years', 10, 5, 15, true],
+      [12, '4NT', '4th Years', 7, 9, 16, true],
+      [13, '4L', '4th Years', 12, 4, 16, true],
+      [14, '4EY', '4th Years', 6, 13, 19, true],
+      [15, 'L5GRA', 'L5th Years', 8, 7, 15, true],
+      [16, 'L5NT', 'L5th Years', 8, 10, 18, true],
+      [17, 'L5L', 'L5th Years', 5, 12, 17, true],
+      [18, 'L5EY', 'L5th Years', 9, 16, 25, true],
+      [19, 'U5G', 'U5th Years', 10, 11, 21, true],
+      [20, 'U5N', 'U5th Years', 9, 11, 20, true],
+      [21, 'U5T', 'U5th Years', 8, 12, 20, true],
+      [22, 'U5LEY', 'U5th Years', 10, 10, 20, true],
+      [23, 'U5MASCOLL', 'U5th Years', 14, 15, 29, true],
+      [24, 'U5SRINGER', 'U5th Years', 10, 16, 26, true]
+    ];
+    
+    sheet.getRange(2, 1, sampleClasses.length, classHeaders.length).setValues(sampleClasses);
+    
+    // Create or reset Attendance sheet (WITH Session column)
+    sheet = ss.getSheetByName('Attendance');
+    if (sheet) {
+      ss.deleteSheet(sheet);
+    }
+    sheet = ss.insertSheet('Attendance');
+    
+    const attendanceHeaders = ['Date', 'ClassID', 'Term', 'Week', 'MalesPresent', 'FemalesPresent', 'TotalPresent', 'Timestamp', 'Session'];
+    sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
+    
+    // Create or reset Terms sheet
+    sheet = ss.getSheetByName('Terms');
+    if (sheet) {
+      ss.deleteSheet(sheet);
+    }
+    sheet = ss.insertSheet('Terms');
+    
+    const termHeaders = ['TermID', 'Name', 'StartDate', 'EndDate', 'Weeks', 'IsActive'];
+    sheet.getRange(1, 1, 1, termHeaders.length).setValues([termHeaders]);
+    
+    const sampleTerms = [
+      ['term1', 'Term 1', '2024-09-08', '2024-12-15', 14, true],
+      ['term2', 'Term 2', '2025-01-08', '2025-04-15', 14, true],
+      ['term3', 'Term 3', '2025-04-22', '2025-07-15', 12, true]
+    ];
+    
+    sheet.getRange(2, 1, sampleTerms.length, termHeaders.length).setValues(sampleTerms);
+    
+    return {
+      success: true,
+      message: 'Sheets setup completed successfully with sample data'
+    };
+  } catch (error) {
+    return {success: false, error: 'Setup failed: ' + error.message};
+  }
+}
