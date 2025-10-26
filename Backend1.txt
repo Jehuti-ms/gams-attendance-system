@@ -108,6 +108,8 @@ function getSheetByName(name) {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
 }
 
+// FIXED saveAttendanceRecord function - Replace in your Backend1.txt
+
 function saveAttendanceRecord(params) {
   try {
     const sheet = ensureAttendanceSheetAndHeaders();
@@ -122,19 +124,33 @@ function saveAttendanceRecord(params) {
       femalesPresent
     } = params || {};
 
+    // Validate required fields
     if (!date || !classId || !term || (week === undefined || week === null || week === '')) {
       return { success: false, error: 'Missing required fields: date, classId, term, week' };
     }
 
+    // Normalize session value
     const sessionValue = (session || 'am').toString().trim().toLowerCase();
+    
+    // Validate session value
+    if (sessionValue !== 'am' && sessionValue !== 'pm') {
+      return { success: false, error: 'Session must be either "am" or "pm"' };
+    }
+
     const males = parseInt(malesPresent || 0, 10) || 0;
     const females = parseInt(femalesPresent || 0, 10) || 0;
     const totalPresent = males + females;
     const timestamp = (new Date()).toISOString();
 
+    // Validate against class totals if available
     let classObj = null;
     if (typeof getClassById === 'function') {
-      try { classObj = getClassById(classId); } catch (e) { classObj = null; }
+      try { 
+        classObj = getClassById(classId); 
+      } catch (e) { 
+        console.log('Could not get class info: ' + e.message);
+      }
+      
       if (classObj) {
         if (classObj.TotalMales !== undefined && !isNaN(classObj.TotalMales) && males > classObj.TotalMales) {
           return { success: false, error: `Males present (${males}) exceeds total males in class (${classObj.TotalMales})` };
@@ -145,30 +161,81 @@ function saveAttendanceRecord(params) {
       }
     }
 
-    const dataRange = sheet.getDataRange();
-    const all = dataRange.getValues();
-    let found = false;
-    let foundRow = -1;
-    for (let r = 1; r < all.length; r++) {
-      const row = all[r];
-      const rowDate = row[0] !== undefined && row[0] !== null ? row[0].toString() : '';
-      const rowClassId = row[1] !== undefined && row[1] !== null ? row[1].toString() : '';
-      const rowSession = row[8] !== undefined && row[8] !== null ? row[8].toString().toLowerCase() : '';
+    // Get all existing data
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 1) {
+      // No data at all, just headers or empty sheet - append new record
+      const record = [date, classId, term, week, males, females, totalPresent, timestamp, sessionValue];
+      sheet.appendRow(record);
+      
+      return {
+        success: true,
+        message: 'Attendance saved successfully',
+        record: {
+          Date: date,
+          ClassID: classId,
+          Term: term,
+          Week: week,
+          MalesPresent: males,
+          FemalesPresent: females,
+          TotalPresent: totalPresent,
+          Timestamp: timestamp,
+          Session: sessionValue
+        }
+      };
+    }
 
-      if (rowDate == date.toString() && rowClassId == classId.toString() && rowSession == sessionValue) {
-        found = true;
-        foundRow = r + 1;
+    // Get all data including headers
+    const dataRange = sheet.getDataRange();
+    const allValues = dataRange.getValues();
+    
+    // Normalize the search values
+    const searchDate = date.toString().trim();
+    const searchClassId = classId.toString().trim();
+    
+    console.log('Searching for: Date=' + searchDate + ', ClassID=' + searchClassId + ', Session=' + sessionValue);
+    
+    // Find existing record (skip header row at index 0)
+    let foundRow = -1;
+    for (let i = 1; i < allValues.length; i++) {
+      const row = allValues[i];
+      
+      // Get and normalize row values
+      const rowDate = (row[0] !== undefined && row[0] !== null && row[0] !== '') 
+        ? row[0].toString().trim() 
+        : '';
+      const rowClassId = (row[1] !== undefined && row[1] !== null && row[1] !== '') 
+        ? row[1].toString().trim() 
+        : '';
+      const rowSession = (row[8] !== undefined && row[8] !== null && row[8] !== '') 
+        ? row[8].toString().trim().toLowerCase() 
+        : '';
+      
+      console.log('Row ' + (i+1) + ': Date=' + rowDate + ', ClassID=' + rowClassId + ', Session=' + rowSession);
+      
+      // Check if this is the record we're looking for
+      if (rowDate === searchDate && rowClassId === searchClassId && rowSession === sessionValue) {
+        foundRow = i + 1; // +1 because sheet rows are 1-indexed
+        console.log('Found matching row at: ' + foundRow);
         break;
       }
     }
 
+    // Prepare the record to save
     const record = [date, classId, term, week, males, females, totalPresent, timestamp, sessionValue];
 
-    if (found) {
+    if (foundRow > 0) {
+      // Update existing record
+      console.log('Updating existing row: ' + foundRow);
       sheet.getRange(foundRow, 1, 1, record.length).setValues([record]);
     } else {
+      // Append new record
+      console.log('Appending new row');
       sheet.appendRow(record);
     }
+
+    // Verify the save
+    SpreadsheetApp.flush();
 
     return {
       success: true,
@@ -187,10 +254,13 @@ function saveAttendanceRecord(params) {
     };
 
   } catch (err) {
+    console.error('Error in saveAttendanceRecord: ' + err.message);
+    console.error('Stack: ' + err.stack);
     return { success: false, error: err.message || String(err) };
   }
 }
 
+// Keep the saveAttendance wrapper
 function saveAttendance(params) {
   return saveAttendanceRecord(params);
 }
