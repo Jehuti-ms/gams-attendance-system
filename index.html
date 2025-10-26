@@ -1769,45 +1769,91 @@
                 }
             }
 
-            async saveAllSessions() {
-                const date = document.getElementById('attendance-date').value;
-                if (!date) {
-                    this.showToast('Please select a date', 'error');
-                    return;
-                }
+           // REPLACE the saveAllSessions() function in your index.html with this fixed version
 
-                const term = document.getElementById('attendance-term').value;
-                const week = document.getElementById('attendance-week').value;
-                const sessionKey = date;
-                
-                // Collect current form data
-                document.querySelectorAll('.attendance-input').forEach(input => {
-                    const classId = input.getAttribute('data-class');
-                    const type = input.getAttribute('data-type');
-                    const value = parseInt(input.value) || 0;
-                    
-                    const attendanceData = this.currentSession === 'am' ? this.attendanceAM : this.attendancePM;
-                    if (!attendanceData[classId]) attendanceData[classId] = {};
-                    attendanceData[classId][type === 'male' ? 'males' : 'females'] = value;
-                });
+async saveAllSessions() {
+    const date = document.getElementById('attendance-date').value;
+    if (!date) {
+        this.showToast('Please select a date', 'error');
+        return;
+    }
 
-                // Save locally
-                sessionStorage.setItem(`gams_att_am_${sessionKey}`, JSON.stringify(this.attendanceAM));
-                sessionStorage.setItem(`gams_att_pm_${sessionKey}`, JSON.stringify(this.attendancePM));
-                
-                // Save to Google Sheets if configured
-                if (this.settings.webAppUrl) {
-                    try {
-                        await this.saveAttendanceToSheets(date, 'am', term, week, this.attendanceAM);
-                        await this.saveAttendanceToSheets(date, 'pm', term, week, this.attendancePM);
-                        this.showToast('Both AM and PM sessions saved to Google Sheets!', 'success');
-                    } catch (error) {
-                        this.showToast(`Sessions saved locally (Sheets error: ${error.message})`, 'warning');
-                    }
-                } else {
-                    this.showToast('Both AM and PM sessions saved successfully!', 'success');
-                }
+    const term = document.getElementById('attendance-term').value;
+    const week = document.getElementById('attendance-week').value;
+    const sessionKey = date;
+    
+    // Collect current form data for the active session
+    document.querySelectorAll('.attendance-input').forEach(input => {
+        const classId = input.getAttribute('data-class');
+        const type = input.getAttribute('data-type');
+        const value = parseInt(input.value) || 0;
+        
+        const attendanceData = this.currentSession === 'am' ? this.attendanceAM : this.attendancePM;
+        if (!attendanceData[classId]) attendanceData[classId] = {};
+        attendanceData[classId][type === 'male' ? 'males' : 'females'] = value;
+    });
+
+    // Check if both sessions have data
+    const hasAMData = Object.keys(this.attendanceAM).some(classId => 
+        this.attendanceAM[classId].males > 0 || this.attendanceAM[classId].females > 0
+    );
+    const hasPMData = Object.keys(this.attendancePM).some(classId => 
+        this.attendancePM[classId].males > 0 || this.attendancePM[classId].females > 0
+    );
+
+    if (!hasAMData && !hasPMData) {
+        this.showToast('Please enter attendance data for at least one session', 'error');
+        return;
+    }
+
+    // Save locally first
+    sessionStorage.setItem(`gams_att_am_${sessionKey}`, JSON.stringify(this.attendanceAM));
+    sessionStorage.setItem(`gams_att_pm_${sessionKey}`, JSON.stringify(this.attendancePM));
+    
+    // Save to Google Sheets if configured
+    if (this.settings.webAppUrl) {
+        try {
+            this.showToast('Saving both sessions...', 'info');
+            
+            // CRITICAL FIX: Save sessions SEQUENTIALLY, not simultaneously
+            // First save AM session if it has data
+            if (hasAMData) {
+                await this.saveAttendanceToSheets(date, 'am', term, week, this.attendanceAM);
+                console.log('AM session saved successfully');
             }
+            
+            // Then save PM session if it has data
+            if (hasPMData) {
+                await this.saveAttendanceToSheets(date, 'pm', term, week, this.attendancePM);
+                console.log('PM session saved successfully');
+            }
+            
+            let message = '';
+            if (hasAMData && hasPMData) {
+                message = 'Both AM and PM sessions saved to Google Sheets!';
+            } else if (hasAMData) {
+                message = 'AM session saved to Google Sheets!';
+            } else {
+                message = 'PM session saved to Google Sheets!';
+            }
+            
+            this.showToast(message, 'success');
+        } catch (error) {
+            console.error('Save all sessions error:', error);
+            this.showToast(`Sessions saved locally (Sheets error: ${error.message})`, 'warning');
+        }
+    } else {
+        let message = '';
+        if (hasAMData && hasPMData) {
+            message = 'Both AM and PM sessions saved successfully!';
+        } else if (hasAMData) {
+            message = 'AM session saved successfully!';
+        } else {
+            message = 'PM session saved successfully!';
+        }
+        this.showToast(message, 'success');
+    }
+}
 
             clearAttendanceForm() {
                 if (confirm('Clear all entries for current session?')) {
@@ -2319,6 +2365,4 @@
         });
     </script>
 </body>
-
 </html>
-
