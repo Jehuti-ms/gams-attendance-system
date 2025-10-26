@@ -1,4 +1,4 @@
-// COMPLETE UPDATED BACKEND CODE - Replace your entire Backend1.txt with this
+// COMPLETE FIXED BACKEND CODE - Replace your entire Backend1.txt with this
 
 // ============================================
 // GAMS Attendance System - Backend
@@ -21,8 +21,19 @@ function doPost(e) {
 function handleRequest(e) {
   const action = e.parameter.action;
   
+  // Log incoming requests for debugging
+  Logger.log('=== INCOMING REQUEST ===');
+  Logger.log('Action: ' + action);
+  Logger.log('All parameters: ' + JSON.stringify(e.parameter));
+  
   try {
     switch(action) {
+      case 'testConnection':
+        return responseToJSON(testConnection());
+      case 'testSheetWrite':
+        return responseToJSON(testSheetWrite());
+      case 'testDirectSave':
+        return responseToJSON(testDirectSave(e.parameter));
       case 'getClasses':
         return responseToJSON(getClasses());
       case 'getTerms':
@@ -30,7 +41,7 @@ function handleRequest(e) {
       case 'getAttendance':
         return responseToJSON(getAttendance(e.parameter));
       case 'saveAttendance':
-        return responseToJSON(saveAttendance(e.parameter));
+        return responseToJSON(saveAttendanceWithLogging(e.parameter));
       case 'saveClass':
         return responseToJSON(saveClass(e.parameter));
       case 'saveAllClasses':
@@ -47,6 +58,8 @@ function handleRequest(e) {
         return responseToJSON({error: 'Invalid action: ' + action});
     }
   } catch (error) {
+    Logger.log('ERROR in handleRequest: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
     return responseToJSON({error: error.message});
   }
 }
@@ -56,61 +69,183 @@ function responseToJSON(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ======= Attendance helpers & saver (single source of truth) =======
+// ============================================
+// Test Functions
+// ============================================
 
-function ensureAttendanceSheetAndHeaders() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Attendance');
-
-  const attendanceHeaders = [
-    'Date',
-    'ClassID',
-    'Term',
-    'Week',
-    'MalesPresent',
-    'FemalesPresent',
-    'TotalPresent',
-    'Timestamp',
-    'Session'
-  ];
-
-  if (!sheet) {
-    sheet = ss.insertSheet('Attendance');
-    sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
-    return sheet;
-  }
-
-  const lastCol = Math.max(sheet.getLastColumn(), attendanceHeaders.length);
-  const existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-
-  let needsReset = false;
-  if (existing.length < attendanceHeaders.length) needsReset = true;
-  else {
-    for (let i = 0; i < attendanceHeaders.length; i++) {
-      if (existing[i] !== attendanceHeaders[i]) {
-        needsReset = true;
-        break;
-      }
-    }
-  }
-
-  if (needsReset) {
-    sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
-    if (lastCol > attendanceHeaders.length) {
-      sheet.getRange(1, attendanceHeaders.length + 1, sheet.getMaxRows(), lastCol - attendanceHeaders.length).clear();
-    }
-  }
-
-  return sheet;
+function testConnection() {
+  return {
+    success: true,
+    message: 'Backend connection successful',
+    timestamp: new Date().toISOString()
+  };
 }
 
-function getSheetByName(name) {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+function testSheetWrite() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Attendance');
+    
+    if (!sheet) {
+      return { success: false, error: 'Attendance sheet not found' };
+    }
+    
+    const testRow = ['TEST', 'TEST', 'TEST', 'TEST', 0, 0, 0, new Date().toISOString(), 'am'];
+    sheet.appendRow(testRow);
+    SpreadsheetApp.flush();
+    
+    const lastRow = sheet.getLastRow();
+    const writtenData = sheet.getRange(lastRow, 1, 1, 9).getValues()[0];
+    
+    return {
+      success: true,
+      message: 'Test write successful',
+      rowNumber: lastRow,
+      writtenData: writtenData
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      stack: err.stack
+    };
+  }
+}
+
+function testDirectSave(params) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Attendance');
+    
+    if (!sheet) {
+      return { success: false, error: 'Attendance sheet not found' };
+    }
+    
+    Logger.log('testDirectSave params: ' + JSON.stringify(params));
+    
+    const date = params.date || '2025-01-15';
+    const classId = params.classId || '1';
+    const term = params.term || 'term1';
+    const week = params.week || '1';
+    const session = params.session || 'am';
+    const males = parseInt(params.malesPresent || 0);
+    const females = parseInt(params.femalesPresent || 0);
+    
+    const record = [
+      date,
+      classId,
+      term,
+      week,
+      males,
+      females,
+      males + females,
+      new Date().toISOString(),
+      session
+    ];
+    
+    Logger.log('About to append: ' + JSON.stringify(record));
+    
+    sheet.appendRow(record);
+    SpreadsheetApp.flush();
+    
+    const lastRow = sheet.getLastRow();
+    Logger.log('Row appended at: ' + lastRow);
+    
+    return {
+      success: true,
+      message: 'Direct save successful',
+      rowNumber: lastRow,
+      record: record
+    };
+    
+  } catch (err) {
+    Logger.log('ERROR: ' + err.message);
+    return {
+      success: false,
+      error: err.message,
+      stack: err.stack
+    };
+  }
+}
+
+// ============================================
+// Attendance Functions (FIXED)
+// ============================================
+
+function ensureAttendanceSheetAndHeaders() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Attendance');
+
+    const attendanceHeaders = [
+      'Date',
+      'ClassID',
+      'Term',
+      'Week',
+      'MalesPresent',
+      'FemalesPresent',
+      'TotalPresent',
+      'Timestamp',
+      'Session'
+    ];
+
+    if (!sheet) {
+      Logger.log('Creating new Attendance sheet');
+      sheet = ss.insertSheet('Attendance');
+      sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
+      sheet.getRange(1, 1, 1, attendanceHeaders.length).setFontWeight('bold');
+      SpreadsheetApp.flush();
+      Logger.log('Attendance sheet created with headers');
+      return sheet;
+    }
+
+    // Check if headers are correct
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < attendanceHeaders.length) {
+      Logger.log('Headers missing or incomplete - setting headers');
+      sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
+      sheet.getRange(1, 1, 1, attendanceHeaders.length).setFontWeight('bold');
+      SpreadsheetApp.flush();
+    } else {
+      const existing = sheet.getRange(1, 1, 1, attendanceHeaders.length).getValues()[0];
+      let needsUpdate = false;
+      
+      for (let i = 0; i < attendanceHeaders.length; i++) {
+        if (existing[i] !== attendanceHeaders[i]) {
+          needsUpdate = true;
+          break;
+        }
+      }
+      
+      if (needsUpdate) {
+        Logger.log('Headers incorrect - updating headers');
+        sheet.getRange(1, 1, 1, attendanceHeaders.length).setValues([attendanceHeaders]);
+        sheet.getRange(1, 1, 1, attendanceHeaders.length).setFontWeight('bold');
+        SpreadsheetApp.flush();
+      }
+    }
+
+    Logger.log('Attendance sheet ready with correct headers');
+    return sheet;
+    
+  } catch (err) {
+    Logger.log('ERROR in ensureAttendanceSheetAndHeaders: ' + err.message);
+    throw err;
+  }
 }
 
 function saveAttendanceRecord(params) {
   try {
+    Logger.log('=== START saveAttendanceRecord ===');
+    Logger.log('Params received: ' + JSON.stringify(params));
+    
     const sheet = ensureAttendanceSheetAndHeaders();
+    
+    if (!sheet) {
+      return { success: false, error: 'Could not access Attendance sheet' };
+    }
+    
+    Logger.log('Sheet accessed: ' + sheet.getName());
 
     const {
       date,
@@ -122,57 +257,145 @@ function saveAttendanceRecord(params) {
       femalesPresent
     } = params || {};
 
+    // Validate required fields
     if (!date || !classId || !term || (week === undefined || week === null || week === '')) {
+      Logger.log('ERROR: Missing required fields');
       return { success: false, error: 'Missing required fields: date, classId, term, week' };
     }
 
+    // Normalize session value
     const sessionValue = (session || 'am').toString().trim().toLowerCase();
+    
+    // Validate session value
+    if (sessionValue !== 'am' && sessionValue !== 'pm') {
+      Logger.log('ERROR: Invalid session value: ' + sessionValue);
+      return { success: false, error: 'Session must be either "am" or "pm"' };
+    }
+
     const males = parseInt(malesPresent || 0, 10) || 0;
     const females = parseInt(femalesPresent || 0, 10) || 0;
     const totalPresent = males + females;
     const timestamp = (new Date()).toISOString();
 
+    Logger.log('Parsed values - Date: ' + date + ', ClassID: ' + classId + ', Session: ' + sessionValue);
+    Logger.log('Males: ' + males + ', Females: ' + females + ', Total: ' + totalPresent);
+
+    // Validate against class totals if available
     let classObj = null;
     if (typeof getClassById === 'function') {
-      try { classObj = getClassById(classId); } catch (e) { classObj = null; }
+      try { 
+        classObj = getClassById(classId); 
+      } catch (e) { 
+        Logger.log('Could not get class info: ' + e.message);
+      }
+      
       if (classObj) {
         if (classObj.TotalMales !== undefined && !isNaN(classObj.TotalMales) && males > classObj.TotalMales) {
+          Logger.log('ERROR: Males present exceeds class total');
           return { success: false, error: `Males present (${males}) exceeds total males in class (${classObj.TotalMales})` };
         }
         if (classObj.TotalFemales !== undefined && !isNaN(classObj.TotalFemales) && females > classObj.TotalFemales) {
+          Logger.log('ERROR: Females present exceeds class total');
           return { success: false, error: `Females present (${females}) exceeds total females in class (${classObj.TotalFemales})` };
         }
       }
     }
 
-    const dataRange = sheet.getDataRange();
-    const all = dataRange.getValues();
-    let found = false;
-    let foundRow = -1;
-    for (let r = 1; r < all.length; r++) {
-      const row = all[r];
-      const rowDate = row[0] !== undefined && row[0] !== null ? row[0].toString() : '';
-      const rowClassId = row[1] !== undefined && row[1] !== null ? row[1].toString() : '';
-      const rowSession = row[8] !== undefined && row[8] !== null ? row[8].toString().toLowerCase() : '';
+    // Prepare the record to save
+    const record = [date, classId, term, week, males, females, totalPresent, timestamp, sessionValue];
+    Logger.log('Record to save: ' + JSON.stringify(record));
 
-      if (rowDate == date.toString() && rowClassId == classId.toString() && rowSession == sessionValue) {
-        found = true;
-        foundRow = r + 1;
+    // Get current last row
+    const lastRow = sheet.getLastRow();
+    Logger.log('Current last row: ' + lastRow);
+    
+    if (lastRow <= 1) {
+      // Only headers or empty sheet - append new record
+      Logger.log('Sheet is empty or has only headers - appending new row');
+      sheet.appendRow(record);
+      SpreadsheetApp.flush();
+      
+      const newLastRow = sheet.getLastRow();
+      Logger.log('After append, last row is: ' + newLastRow);
+      
+      return {
+        success: true,
+        message: 'Attendance saved successfully (new record)',
+        record: {
+          Date: date,
+          ClassID: classId,
+          Term: term,
+          Week: week,
+          MalesPresent: males,
+          FemalesPresent: females,
+          TotalPresent: totalPresent,
+          Timestamp: timestamp,
+          Session: sessionValue
+        }
+      };
+    }
+
+    // Get all data to search for duplicates
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 9);
+    const allValues = dataRange.getValues();
+    
+    Logger.log('Retrieved ' + allValues.length + ' data rows to search');
+    
+    // Normalize the search values
+    const searchDate = date.toString().trim();
+    const searchClassId = classId.toString().trim();
+    
+    Logger.log('Searching for match: Date=' + searchDate + ', ClassID=' + searchClassId + ', Session=' + sessionValue);
+    
+    // Find existing record
+    let foundRow = -1;
+    for (let i = 0; i < allValues.length; i++) {
+      const row = allValues[i];
+      
+      const rowDate = (row[0] !== undefined && row[0] !== null && row[0] !== '') 
+        ? row[0].toString().trim() 
+        : '';
+      const rowClassId = (row[1] !== undefined && row[1] !== null && row[1] !== '') 
+        ? row[1].toString().trim() 
+        : '';
+      const rowSession = (row[8] !== undefined && row[8] !== null && row[8] !== '') 
+        ? row[8].toString().trim().toLowerCase() 
+        : '';
+      
+      Logger.log('Checking row ' + (i + 2) + ': Date=' + rowDate + ', ClassID=' + rowClassId + ', Session=' + rowSession);
+      
+      if (rowDate === searchDate && rowClassId === searchClassId && rowSession === sessionValue) {
+        foundRow = i + 2;
+        Logger.log('FOUND MATCH at sheet row: ' + foundRow);
         break;
       }
     }
 
-    const record = [date, classId, term, week, males, females, totalPresent, timestamp, sessionValue];
-
-    if (found) {
-      sheet.getRange(foundRow, 1, 1, record.length).setValues([record]);
+    if (foundRow > 0) {
+      // Update existing record
+      Logger.log('UPDATING existing row ' + foundRow);
+      const targetRange = sheet.getRange(foundRow, 1, 1, record.length);
+      targetRange.setValues([record]);
+      Logger.log('Range updated: ' + targetRange.getA1Notation());
     } else {
+      // Append new record
+      Logger.log('NO MATCH FOUND - Appending new row');
       sheet.appendRow(record);
     }
 
+    // Force write to sheet
+    SpreadsheetApp.flush();
+    Logger.log('SpreadsheetApp.flush() called');
+    
+    // Verify the write
+    const verifyLastRow = sheet.getLastRow();
+    Logger.log('After save operation, last row is: ' + verifyLastRow);
+
+    Logger.log('=== END saveAttendanceRecord SUCCESS ===');
+    
     return {
       success: true,
-      message: 'Attendance saved successfully',
+      message: 'Attendance saved successfully' + (foundRow > 0 ? ' (updated row ' + foundRow + ')' : ' (new row)'),
       record: {
         Date: date,
         ClassID: classId,
@@ -187,12 +410,84 @@ function saveAttendanceRecord(params) {
     };
 
   } catch (err) {
-    return { success: false, error: err.message || String(err) };
+    Logger.log('=== ERROR in saveAttendanceRecord ===');
+    Logger.log('Error message: ' + err.message);
+    Logger.log('Error stack: ' + err.stack);
+    return { success: false, error: 'Save failed: ' + err.message };
   }
+}
+
+function saveAttendanceWithLogging(params) {
+  Logger.log('=== SAVE ATTENDANCE CALLED ===');
+  Logger.log('Raw params object: ' + JSON.stringify(params));
+  Logger.log('Params type: ' + typeof params);
+  Logger.log('Params keys: ' + Object.keys(params || {}).join(', '));
+  
+  if (params) {
+    Logger.log('date: ' + params.date + ' (type: ' + typeof params.date + ')');
+    Logger.log('classId: ' + params.classId + ' (type: ' + typeof params.classId + ')');
+    Logger.log('term: ' + params.term + ' (type: ' + typeof params.term + ')');
+    Logger.log('week: ' + params.week + ' (type: ' + typeof params.week + ')');
+    Logger.log('session: ' + params.session + ' (type: ' + typeof params.session + ')');
+    Logger.log('malesPresent: ' + params.malesPresent + ' (type: ' + typeof params.malesPresent + ')');
+    Logger.log('femalesPresent: ' + params.femalesPresent + ' (type: ' + typeof params.femalesPresent + ')');
+  }
+  
+  const result = saveAttendanceRecord(params);
+  
+  Logger.log('Result: ' + JSON.stringify(result));
+  Logger.log('=== END SAVE ATTENDANCE ===');
+  
+  return result;
 }
 
 function saveAttendance(params) {
   return saveAttendanceRecord(params);
+}
+
+function getAttendance(params) {
+  try {
+    const { classId, term, week, session } = params;
+    
+    const sheet = getSheetByName('Attendance');
+    if (!sheet) {
+      return { success: false, error: 'Attendance sheet not found' };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    const records = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      let matches = true;
+      
+      if (classId && row[1] != classId) matches = false;
+      if (term && row[2] != term) matches = false;
+      if (week && row[3] != week) matches = false;
+      if (session && row[8] && row[8].toString().toLowerCase() !== session.toLowerCase()) matches = false;
+      
+      if (matches) {
+        records.push({
+          date: row[0],
+          classId: row[1],
+          term: row[2],
+          week: row[3],
+          malesPresent: row[4],
+          femalesPresent: row[5],
+          totalPresent: row[6],
+          timestamp: row[7],
+          session: row[8]
+        });
+      }
+    }
+    
+    return {
+      success: true,
+      records: records
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
 // ============================================
@@ -406,6 +701,10 @@ function saveTerms(params) {
 // ============================================
 // Sheet Service Functions
 // ============================================
+
+function getSheetByName(name) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+}
 
 function getDataAsObjects(sheetName) {
   const sheet = getSheetByName(sheetName);
