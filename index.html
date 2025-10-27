@@ -2153,14 +2153,14 @@ async saveAllSessions() {
                     const response = await this.makeRequest('getClasses');
                     
                     if (response.success) {
-                        this.showToast('âœ… Connected to Google Sheets successfully!', 'success');
+                        this.showToast('✅ Connected to Google Sheets successfully!', 'success');
                         this.classes = response.classes;
                         sessionStorage.setItem('gams_classes', JSON.stringify(this.classes));
                     } else {
                         throw new Error(response.error || 'Connection failed');
                     }
                 } catch (error) {
-                    this.showToast('âŒ Connection failed: ' + error.message, 'error');
+                    this.showToast('❌ Connection failed: ' + error.message, 'error');
                 }
             }
 
@@ -2372,6 +2372,7 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
+
 
 
 
