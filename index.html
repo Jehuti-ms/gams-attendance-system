@@ -1477,8 +1477,8 @@
                         <input type="number" class="form-control male-count" value="${cls.totalMales || 0}" min="0" placeholder="Males" required>
                         <input type="number" class="form-control female-count" value="${cls.totalFemales || 0}" min="0" placeholder="Females" required>
                         <span class="class-size">Total: <span>${cls.classSize || 0}</span></span>
-                        <button type="button" class="btn btn-success btn-sm save-single-class" data-year="${yearGroup}">ðŸ’¾ Save</button>
-                        <button type="button" class="btn btn-danger btn-sm remove-class">Ã—</button>
+                        <button type="button" class="btn btn-success btn-sm save-single-class" data-year="${yearGroup}">✅ Save</button>
+                        <button type="button" class="btn btn-danger btn-sm remove-class">❌</button>
                     </div>
                 `;
             }
@@ -1964,7 +1964,7 @@ async saveAllSessions() {
                             <label style="display: flex; align-items: center; gap: 5px;">
                                 <input type="checkbox" class="term-active" ${term.isActive ? 'checked' : ''}> Active
                             </label>
-                            <button type="button" class="btn btn-danger remove-term">Ã—</button>
+                            <button type="button" class="btn btn-danger remove-term">❌</button>
                         </div>
                     `;
                 });
@@ -2004,7 +2004,7 @@ async saveAllSessions() {
                         <label style="display: flex; align-items: center; gap: 5px;">
                             <input type="checkbox" class="term-active" checked> Active
                         </label>
-                        <button type="button" class="btn btn-danger remove-term">Ã—</button>
+                        <button type="button" class="btn btn-danger remove-term">❌</button>
                     </div>
                 `;
                 container.insertAdjacentHTML('beforeend', html);
@@ -2043,10 +2043,10 @@ async saveAllSessions() {
                     try {
                         this.showToast('Saving terms to Google Sheets...', 'info');
                         await this.saveTermsToSheets();
-                        this.showToast('âœ… Terms saved to Google Sheets successfully!', 'success');
+                        this.showToast('✅ Terms saved to Google Sheets successfully!', 'success');
                     } catch (error) {
                         console.error('Terms save error:', error);
-                        this.showToast(`âš ï¸ Terms saved locally only (Sheets error: ${error.message})`, 'warning');
+                        this.showToast(`⚠️ Terms saved locally only (Sheets error: ${error.message})`, 'warning');
                     }
                 } else {
                     this.showToast('Terms saved locally! Configure Google Sheets in Settings to sync.', 'success');
@@ -2177,13 +2177,13 @@ async saveAllSessions() {
                     const response = await this.makeRequest('setupSheets');
                     
                     if (response.success) {
-                        this.showToast('âœ… Sheets initialized successfully!', 'success');
+                        this.showToast('Sheets initialized successfully!', 'success');
                         await this.testConnection();
                     } else {
                         throw new Error(response.error || 'Setup failed');
                     }
                 } catch (error) {
-                    this.showToast('âŒ Setup failed: ' + error.message, 'error');
+                    this.showToast('Setup failed: ' + error.message, 'error');
                 }
             }
 
@@ -2372,6 +2372,7 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
+
 
 
 
