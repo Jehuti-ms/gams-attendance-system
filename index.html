@@ -829,7 +829,7 @@
     <header>
         <div class="header-content">
             <div class="logo">
-                <span class="logo-icon">🏫</span>
+                <span class="logo-icon">ðŸ«</span>
                 <h1>Attendance Track</h1>
 		    </div>
             <nav>
@@ -840,7 +840,7 @@
                     <li><a class="nav-link" data-page="reports">Reports</a></li>
                     <li><a class="nav-link" data-page="maintenance">Maintenance</a></li>
                     <li><a class="nav-link" data-page="settings">Settings</a></li>
-                    <li><button class="theme-toggle" id="theme-toggle">🌙</button></li>
+                    <li><button class="theme-toggle" id="theme-toggle">ðŸŒ™</button></li>
                     <li><a class="nav-link" id="logout-btn">Logout</a></li>
                 </ul>
             </nav>
@@ -853,7 +853,7 @@
             <div class="login-container">
                 <div class="login-card">
                     <div class="school-logo">
-                        <span class="logo-large">🏫</span>
+                        <span class="logo-large">ðŸ«</span>
                         <h2>Attendance Track</h2>
                     </div>
                     <h3>Attendance Tracking System</h3>
@@ -887,28 +887,28 @@
 
             <div class="metrics-grid">
                 <div class="metric-card">
-                    <div class="metric-icon">👥</div>
+                    <div class="metric-icon">ðŸ‘¥</div>
                     <div class="metric-content">
                         <h3>Total Students</h3>
                         <span class="metric-value" id="total-students">0</span>
                     </div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-icon">📊</div>
+                    <div class="metric-icon">ðŸ“Š</div>
                     <div class="metric-content">
                         <h3>Today's Attendance</h3>
                         <span class="metric-value" id="daily-attendance">0%</span>
                     </div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-icon">📈</div>
+                    <div class="metric-icon">ðŸ“ˆ</div>
                     <div class="metric-content">
                         <h3>Weekly Average</h3>
                         <span class="metric-value" id="weekly-attendance">0%</span>
                     </div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-icon">🎓</div>
+                    <div class="metric-icon">ðŸŽ“</div>
                     <div class="metric-content">
                         <h3>Classes</h3>
                         <span class="metric-value" id="total-classes">0</span>
@@ -1122,9 +1122,9 @@
                 <h3>Instructions</h3>
                 <ol style="line-height: 2; padding-left: 20px;">
                     <li>Open your Google Sheet</li>
-                    <li>Go to <strong>Extensions → Apps Script</strong></li>
+                    <li>Go to <strong>Extensions â†’ Apps Script</strong></li>
                     <li>Copy and paste the backend code</li>
-                    <li>Click <strong>Deploy → New Deployment</strong></li>
+                    <li>Click <strong>Deploy â†’ New Deployment</strong></li>
                     <li>Select type: <strong>Web app</strong></li>
                     <li>Execute as: <strong>Me</strong></li>
                     <li>Who has access: <strong>Anyone</strong></li>
@@ -1231,14 +1231,14 @@
                 const themeToggle = document.getElementById('theme-toggle');
                 const savedTheme = sessionStorage.getItem('gams_theme') || 'light';
                 document.documentElement.setAttribute('data-theme', savedTheme);
-                themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+                themeToggle.textContent = savedTheme === 'dark' ? 'â˜€ï¸' : 'ðŸŒ™';
 
                 themeToggle.addEventListener('click', () => {
                     const currentTheme = document.documentElement.getAttribute('data-theme');
                     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                     document.documentElement.setAttribute('data-theme', newTheme);
                     sessionStorage.setItem('gams_theme', newTheme);
-                    themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+                    themeToggle.textContent = newTheme === 'dark' ? 'â˜€ï¸' : 'ðŸŒ™';
                 });
             }
 
@@ -1477,8 +1477,8 @@
                         <input type="number" class="form-control male-count" value="${cls.totalMales || 0}" min="0" placeholder="Males" required>
                         <input type="number" class="form-control female-count" value="${cls.totalFemales || 0}" min="0" placeholder="Females" required>
                         <span class="class-size">Total: <span>${cls.classSize || 0}</span></span>
-                        <button type="button" class="btn btn-success btn-sm save-single-class" data-year="${yearGroup}">💾 Save</button>
-                        <button type="button" class="btn btn-danger btn-sm remove-class">×</button>
+                        <button type="button" class="btn btn-success btn-sm save-single-class" data-year="${yearGroup}">ðŸ’¾ Save</button>
+                        <button type="button" class="btn btn-danger btn-sm remove-class">Ã—</button>
                     </div>
                 `;
             }
@@ -1964,7 +1964,7 @@ async saveAllSessions() {
                             <label style="display: flex; align-items: center; gap: 5px;">
                                 <input type="checkbox" class="term-active" ${term.isActive ? 'checked' : ''}> Active
                             </label>
-                            <button type="button" class="btn btn-danger remove-term">×</button>
+                            <button type="button" class="btn btn-danger remove-term">Ã—</button>
                         </div>
                     `;
                 });
@@ -2004,7 +2004,7 @@ async saveAllSessions() {
                         <label style="display: flex; align-items: center; gap: 5px;">
                             <input type="checkbox" class="term-active" checked> Active
                         </label>
-                        <button type="button" class="btn btn-danger remove-term">×</button>
+                        <button type="button" class="btn btn-danger remove-term">Ã—</button>
                     </div>
                 `;
                 container.insertAdjacentHTML('beforeend', html);
@@ -2043,10 +2043,10 @@ async saveAllSessions() {
                     try {
                         this.showToast('Saving terms to Google Sheets...', 'info');
                         await this.saveTermsToSheets();
-                        this.showToast('✅ Terms saved to Google Sheets successfully!', 'success');
+                        this.showToast('âœ… Terms saved to Google Sheets successfully!', 'success');
                     } catch (error) {
                         console.error('Terms save error:', error);
-                        this.showToast(`⚠️ Terms saved locally only (Sheets error: ${error.message})`, 'warning');
+                        this.showToast(`âš ï¸ Terms saved locally only (Sheets error: ${error.message})`, 'warning');
                     }
                 } else {
                     this.showToast('Terms saved locally! Configure Google Sheets in Settings to sync.', 'success');
@@ -2153,14 +2153,14 @@ async saveAllSessions() {
                     const response = await this.makeRequest('getClasses');
                     
                     if (response.success) {
-                        this.showToast('✅ Connected to Google Sheets successfully!', 'success');
+                        this.showToast('âœ… Connected to Google Sheets successfully!', 'success');
                         this.classes = response.classes;
                         sessionStorage.setItem('gams_classes', JSON.stringify(this.classes));
                     } else {
                         throw new Error(response.error || 'Connection failed');
                     }
                 } catch (error) {
-                    this.showToast('❌ Connection failed: ' + error.message, 'error');
+                    this.showToast('âŒ Connection failed: ' + error.message, 'error');
                 }
             }
 
@@ -2177,13 +2177,13 @@ async saveAllSessions() {
                     const response = await this.makeRequest('setupSheets');
                     
                     if (response.success) {
-                        this.showToast('✅ Sheets initialized successfully!', 'success');
+                        this.showToast('âœ… Sheets initialized successfully!', 'success');
                         await this.testConnection();
                     } else {
                         throw new Error(response.error || 'Setup failed');
                     }
                 } catch (error) {
-                    this.showToast('❌ Setup failed: ' + error.message, 'error');
+                    this.showToast('âŒ Setup failed: ' + error.message, 'error');
                 }
             }
 
@@ -2358,7 +2358,7 @@ async saveAllSessions() {
                 toast.className = `toast ${type}`;
                 toast.innerHTML = `
                     <span>${message}</span>
-                    <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: inherit;">×</button>
+                    <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: inherit;">Ã—</button>
                 `;
                 
                 toastContainer.appendChild(toast);
@@ -2372,8 +2372,3 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
-
-
-
-
-
