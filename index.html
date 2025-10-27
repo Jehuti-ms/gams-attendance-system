@@ -5,59 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance Track</title>
 	 <!-- Favicon for browser tab -->
-     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#bgGrad)" rx="115"/>
-  <rect x="140" y="110" width="232" height="310" fill="white" rx="20"/>
-  <rect x="210" y="90" width="92" height="45" fill="#c7d2fe" rx="10"/>
-  <rect x="220" y="100" width="72" height="25" fill="white" rx="6"/>
-  <rect x="170" y="160" width="172" height="20" fill="#4f46e5" rx="10"/>
-  <circle cx="190" cy="220" r="18" fill="#10b981"/>
-  <polyline points="182,220 188,226 198,214" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="220" y="212" width="110" height="12" fill="#e5e7eb" rx="6"/>
-  <circle cx="190" cy="280" r="18" fill="#ef4444"/>
-  <line x1="184" y1="274" x2="196" y2="286" stroke="white" stroke-width="4" stroke-linecap="round"/>
-  <line x1="196" y1="274" x2="184" y2="286" stroke="white" stroke-width="4" stroke-linecap="round"/>
-  <rect x="220" y="272" width="110" height="12" fill="#e5e7eb" rx="6"/>
-  <circle cx="190" cy="340" r="18" fill="#10b981"/>
-  <polyline points="182,340 188,346 198,334" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="220" y="332" width="110" height="12" fill="#e5e7eb" rx="6"/>
-  <circle cx="380" cy="370" r="50" fill="#10b981"/>
-  <circle cx="380" cy="370" r="35" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="6"/>
-  <circle cx="380" cy="370" r="35" fill="none" stroke="white" stroke-width="6" stroke-dasharray="164 220" stroke-linecap="round" transform="rotate(-90 380 370)"/>
-  <polyline points="368,370 376,378 392,362" fill="none" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="300" y="130" width="35" height="35" fill="#a5b4fc" rx="5"/>
-  <rect x="300" y="130" width="35" height="10" fill="#6366f1" rx="5"/>
-  <rect x="308" y="145" width="6" height="6" fill="white" rx="1"/>
-  <rect x="320" y="145" width="6" height="6" fill="white" rx="1"/>
-  <rect x="308" y="154" width="6" height="6" fill="white" rx="1"/>
-  <rect x="320" y="154" width="6" height="6" fill="white" rx="1"/>
-</svg>
-
-	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect x="140" y="110" width="232" height="310" fill="white" rx="20"/>
-  <rect x="210" y="90" width="92" height="45" fill="#c7d2fe" rx="10"/>
-  <rect x="220" y="100" width="72" height="25" fill="white" rx="6"/>
-  <rect x="170" y="160" width="172" height="20" fill="#4f46e5" rx="10"/>
-  <circle cx="190" cy="220" r="18" fill="#10b981"/>
-  <polyline points="182,220 188,226 198,214" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="220" y="212" width="110" height="12" fill="#e5e7eb" rx="6"/>
-  <circle cx="190" cy="280" r="18" fill="#ef4444"/>
-  <line x1="184" y1="274" x2="196" y2="286" stroke="white" stroke-width="4" stroke-linecap="round"/>
-  <line x1="196" y1="274" x2="184" y2="286" stroke="white" stroke-width="4" stroke-linecap="round"/>
-  <rect x="220" y="272" width="110" height="12" fill="#e5e7eb" rx="6"/>
-  <circle cx="190" cy="340" r="18" fill="#10b981"/>
-  <polyline points="182,340 188,346 198,334" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="220" y="332" width="110" height="12" fill="#e5e7eb" rx="6"/>
-</svg>
-
-	<link rel="icon" type="image/svg+xml" href="attendance-icon-small.svg">
-
+     <!-- Favicon for browsers -->
+			<link rel="icon" type="image/svg+xml" href="icon.svg">
+			<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+			
+			<!-- Icons for different devices -->
+			<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+			<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+			<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+			
+			<!-- Web App Manifest -->
+			<link rel="manifest" href="manifest.json">
+			
+			<!-- Theme color for mobile browsers -->
+			<meta name="theme-color" content="#667eea">
     <style>
         * {
             margin: 0;
@@ -2411,6 +2372,7 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
+
 
 
 
