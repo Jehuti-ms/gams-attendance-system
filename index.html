@@ -1231,14 +1231,14 @@
                 const themeToggle = document.getElementById('theme-toggle');
                 const savedTheme = sessionStorage.getItem('gams_theme') || 'light';
                 document.documentElement.setAttribute('data-theme', savedTheme);
-                themeToggle.textContent = savedTheme === 'dark' ? 'â˜€ï¸' : 'ðŸŒ™';
+                themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 
                 themeToggle.addEventListener('click', () => {
                     const currentTheme = document.documentElement.getAttribute('data-theme');
                     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                     document.documentElement.setAttribute('data-theme', newTheme);
                     sessionStorage.setItem('gams_theme', newTheme);
-                    themeToggle.textContent = newTheme === 'dark' ? 'â˜€ï¸' : 'ðŸŒ™';
+                    themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
                 });
             }
 
@@ -2372,6 +2372,7 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
+
 
 
 
