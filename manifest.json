@@ -1,4 +1,8 @@
 {
+  "webAppUrl": "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec",
+  "sheetId": "YOUR_GOOGLE_SHEET_ID",
+  "schoolName": "Your School Name",
+  "schoolLogo": "",
   "name": "Attendance Track",
   "short_name": "Attendance",
   "description": "Student Attendance Tracking System",
