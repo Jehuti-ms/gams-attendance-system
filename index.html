@@ -1138,7 +1138,7 @@
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script>
+   <script>
         class AttendanceApp {
             constructor() {
                 this.currentUser = null;
@@ -1157,7 +1157,8 @@
                 this.init();
             }
 
-            init() {
+            async init() {
+                await this.loadConfigFromFile();
                 this.loadData();
                 this.initAuth();
                 this.initNavigation();
@@ -1165,19 +1166,57 @@
                 this.showPage(this.currentUser ? 'dashboard' : 'login');
             }
 
-          loadData() {
-		        const savedUser = sessionStorage.getItem('gams_user');
-		        if (savedUser) this.currentUser = JSON.parse(savedUser);
-		
-		        // 🔹 Load permanent settings from localStorage
-		        const savedSettings = localStorage.getItem('gams_settings');
-		        if (savedSettings) {
-		            this.settings = JSON.parse(savedSettings);
-		        }
-                const savedTerms = sessionStorage.getItem('gams_terms');
+            async loadConfigFromFile() {
+                try {
+                    const response = await fetch('config.json');
+                    if (response.ok) {
+                        const config = await response.json();
+                        
+                        // Check if settings already exist in localStorage
+                        const existingSettings = localStorage.getItem('gams_settings');
+                        
+                        if (!existingSettings) {
+                            // First time setup - load from config file
+                            if (config.webAppUrl || config.sheetId || config.docId) {
+                                this.settings = {
+                                    webAppUrl: config.webAppUrl || '',
+                                    sheetId: config.sheetId || '',
+                                    docId: config.docId || ''
+                                };
+                                localStorage.setItem('gams_settings', JSON.stringify(this.settings));
+                                console.log('Configuration loaded from config.json and saved to localStorage');
+                            }
+                        } else {
+                            // Settings exist in localStorage, use those
+                            this.settings = JSON.parse(existingSettings);
+                            console.log('Configuration loaded from localStorage');
+                        }
+                    }
+                } catch (error) {
+                    console.log('No config.json found or error loading it, using localStorage only');
+                    // If config file doesn't exist, try to load from localStorage
+                    const existingSettings = localStorage.getItem('gams_settings');
+                    if (existingSettings) {
+                        this.settings = JSON.parse(existingSettings);
+                    }
+                }
+            }
+
+            loadData() {
+                // Load user from sessionStorage (temporary session data)
+                const savedUser = sessionStorage.getItem('gams_user');
+                if (savedUser) this.currentUser = JSON.parse(savedUser);
+
+                // Load settings from localStorage (persistent across sessions)
+                const savedSettings = localStorage.getItem('gams_settings');
+                if (savedSettings) this.settings = JSON.parse(savedSettings);
+
+                // Load terms from localStorage
+                const savedTerms = localStorage.getItem('gams_terms');
                 if (savedTerms) this.terms = JSON.parse(savedTerms);
 
-                const savedClasses = sessionStorage.getItem('gams_classes');
+                // Load classes from localStorage
+                const savedClasses = localStorage.getItem('gams_classes');
                 if (savedClasses) {
                     this.classes = JSON.parse(savedClasses);
                 } else {
@@ -1209,7 +1248,8 @@
                     ];
                 }
 
-                const savedAttendance = sessionStorage.getItem('gams_attendance');
+                // Load attendance records from localStorage
+                const savedAttendance = localStorage.getItem('gams_attendance');
                 if (savedAttendance) this.attendanceRecords = JSON.parse(savedAttendance);
             }
 
@@ -1231,7 +1271,7 @@
 
             initThemeToggle() {
                 const themeToggle = document.getElementById('theme-toggle');
-                const savedTheme = sessionStorage.getItem('gams_theme') || 'light';
+                const savedTheme = localStorage.getItem('gams_theme') || 'light';
                 document.documentElement.setAttribute('data-theme', savedTheme);
                 themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 
@@ -1239,7 +1279,7 @@
                     const currentTheme = document.documentElement.getAttribute('data-theme');
                     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                     document.documentElement.setAttribute('data-theme', newTheme);
-                    sessionStorage.setItem('gams_theme', newTheme);
+                    localStorage.setItem('gams_theme', newTheme);
                     themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
                 });
             }
@@ -1397,7 +1437,7 @@
                         const response = await this.makeRequest('getRecentAttendance', { limit: 5 });
                         if (response.success && response.records && response.records.length > 0) {
                             this.attendanceRecords = response.records;
-                            sessionStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
+                            localStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
                         }
                     } catch (error) {
                         console.log('Could not load from sheets, using local data');
@@ -1419,7 +1459,6 @@
                     recordsByDate[record.date].push(record);
                 });
 
-                // Sort dates in descending order
                 const sortedDates = Object.keys(recordsByDate).sort((a, b) => new Date(b) - new Date(a));
                 
                 let html = '';
@@ -1555,9 +1594,8 @@
                     this.classes.push(newClass);
                 }
 
-                sessionStorage.setItem('gams_classes', JSON.stringify(this.classes));
+                localStorage.setItem('gams_classes', JSON.stringify(this.classes));
                 
-                // Save to Google Sheets if configured
                 if (this.settings.webAppUrl) {
                     try {
                         await this.saveClassesToSheets();
@@ -1597,9 +1635,8 @@
                 });
 
                 this.classes = classes;
-                sessionStorage.setItem('gams_classes', JSON.stringify(this.classes));
+                localStorage.setItem('gams_classes', JSON.stringify(this.classes));
                 
-                // Save to Google Sheets if configured
                 if (this.settings.webAppUrl) {
                     try {
                         await this.saveClassesToSheets();
@@ -1614,7 +1651,7 @@
 
             resetClasses() {
                 if (confirm('Are you sure you want to reset all classes?')) {
-                    sessionStorage.removeItem('gams_classes');
+                    localStorage.removeItem('gams_classes');
                     this.loadData();
                     this.initSetup();
                     this.showToast('Classes reset successfully', 'warning');
@@ -1667,8 +1704,8 @@
 
             loadAttendanceSessions(date) {
                 const sessionKey = date;
-                const savedAM = sessionStorage.getItem(`gams_att_am_${sessionKey}`);
-                const savedPM = sessionStorage.getItem(`gams_att_pm_${sessionKey}`);
+                const savedAM = localStorage.getItem(`gams_att_am_${sessionKey}`);
+                const savedPM = localStorage.getItem(`gams_att_pm_${sessionKey}`);
 
                 this.attendanceAM = savedAM ? JSON.parse(savedAM) : {};
                 this.attendancePM = savedPM ? JSON.parse(savedPM) : {};
@@ -1761,10 +1798,8 @@
                 const sessionKey = date;
                 const attendanceData = this.currentSession === 'am' ? this.attendanceAM : this.attendancePM;
                 
-                // Save locally
-                sessionStorage.setItem(`gams_att_${this.currentSession}_${sessionKey}`, JSON.stringify(attendanceData));
+                localStorage.setItem(`gams_att_${this.currentSession}_${sessionKey}`, JSON.stringify(attendanceData));
                 
-                // Save to Google Sheets if configured
                 if (this.settings.webAppUrl) {
                     try {
                         await this.saveAttendanceToSheets(date, this.currentSession, term, week, attendanceData);
@@ -1777,91 +1812,82 @@
                 }
             }
 
-           // REPLACE the saveAllSessions() function in your index.html with this fixed version
+            async saveAllSessions() {
+                const date = document.getElementById('attendance-date').value;
+                if (!date) {
+                    this.showToast('Please select a date', 'error');
+                    return;
+                }
 
-async saveAllSessions() {
-    const date = document.getElementById('attendance-date').value;
-    if (!date) {
-        this.showToast('Please select a date', 'error');
-        return;
-    }
+                const term = document.getElementById('attendance-term').value;
+                const week = document.getElementById('attendance-week').value;
+                const sessionKey = date;
+                
+                document.querySelectorAll('.attendance-input').forEach(input => {
+                    const classId = input.getAttribute('data-class');
+                    const type = input.getAttribute('data-type');
+                    const value = parseInt(input.value) || 0;
+                    
+                    const attendanceData = this.currentSession === 'am' ? this.attendanceAM : this.attendancePM;
+                    if (!attendanceData[classId]) attendanceData[classId] = {};
+                    attendanceData[classId][type === 'male' ? 'males' : 'females'] = value;
+                });
 
-    const term = document.getElementById('attendance-term').value;
-    const week = document.getElementById('attendance-week').value;
-    const sessionKey = date;
-    
-    // Collect current form data for the active session
-    document.querySelectorAll('.attendance-input').forEach(input => {
-        const classId = input.getAttribute('data-class');
-        const type = input.getAttribute('data-type');
-        const value = parseInt(input.value) || 0;
-        
-        const attendanceData = this.currentSession === 'am' ? this.attendanceAM : this.attendancePM;
-        if (!attendanceData[classId]) attendanceData[classId] = {};
-        attendanceData[classId][type === 'male' ? 'males' : 'females'] = value;
-    });
+                const hasAMData = Object.keys(this.attendanceAM).some(classId => 
+                    this.attendanceAM[classId].males > 0 || this.attendanceAM[classId].females > 0
+                );
+                const hasPMData = Object.keys(this.attendancePM).some(classId => 
+                    this.attendancePM[classId].males > 0 || this.attendancePM[classId].females > 0
+                );
 
-    // Check if both sessions have data
-    const hasAMData = Object.keys(this.attendanceAM).some(classId => 
-        this.attendanceAM[classId].males > 0 || this.attendanceAM[classId].females > 0
-    );
-    const hasPMData = Object.keys(this.attendancePM).some(classId => 
-        this.attendancePM[classId].males > 0 || this.attendancePM[classId].females > 0
-    );
+                if (!hasAMData && !hasPMData) {
+                    this.showToast('Please enter attendance data for at least one session', 'error');
+                    return;
+                }
 
-    if (!hasAMData && !hasPMData) {
-        this.showToast('Please enter attendance data for at least one session', 'error');
-        return;
-    }
-
-    // Save locally first
-    sessionStorage.setItem(`gams_att_am_${sessionKey}`, JSON.stringify(this.attendanceAM));
-    sessionStorage.setItem(`gams_att_pm_${sessionKey}`, JSON.stringify(this.attendancePM));
-    
-    // Save to Google Sheets if configured
-    if (this.settings.webAppUrl) {
-        try {
-            this.showToast('Saving both sessions...', 'info');
-            
-            // CRITICAL FIX: Save sessions SEQUENTIALLY, not simultaneously
-            // First save AM session if it has data
-            if (hasAMData) {
-                await this.saveAttendanceToSheets(date, 'am', term, week, this.attendanceAM);
-                console.log('AM session saved successfully');
+                localStorage.setItem(`gams_att_am_${sessionKey}`, JSON.stringify(this.attendanceAM));
+                localStorage.setItem(`gams_att_pm_${sessionKey}`, JSON.stringify(this.attendancePM));
+                
+                if (this.settings.webAppUrl) {
+                    try {
+                        this.showToast('Saving both sessions...', 'info');
+                        
+                        if (hasAMData) {
+                            await this.saveAttendanceToSheets(date, 'am', term, week, this.attendanceAM);
+                            console.log('AM session saved successfully');
+                        }
+                        
+                        if (hasPMData) {
+                            await this.saveAttendanceToSheets(date, 'pm', term, week, this.attendancePM);
+                            console.log('PM session saved successfully');
+                        }
+                        
+                        let message = '';
+                        if (hasAMData && hasPMData) {
+                            message = 'Both AM and PM sessions saved to Google Sheets!';
+                        } else if (hasAMData) {
+                            message = 'AM session saved to Google Sheets!';
+                        } else {
+                            message = 'PM session saved to Google Sheets!';
+                        }
+                        
+                        this.showToast(message, 'success');
+                    } catch (error) {
+                        console.error('Save all sessions error:', error);
+                        this.showToast(`Sessions saved locally (Sheets error: ${error.message})`, 'warning');
+                    }
+                } else {
+                    let message = '';
+                    if (hasAMData && hasPMData) {
+                        message = 'Both AM and PM sessions saved successfully!';
+                    } else if (hasAMData) {
+                        message = 'AM session saved successfully!';
+                    } else {
+                        message = 'PM session saved successfully!';
+                    }
+                    this.showToast(message, 'success');
+                }
             }
-            
-            // Then save PM session if it has data
-            if (hasPMData) {
-                await this.saveAttendanceToSheets(date, 'pm', term, week, this.attendancePM);
-                console.log('PM session saved successfully');
-            }
-            
-            let message = '';
-            if (hasAMData && hasPMData) {
-                message = 'Both AM and PM sessions saved to Google Sheets!';
-            } else if (hasAMData) {
-                message = 'AM session saved to Google Sheets!';
-            } else {
-                message = 'PM session saved to Google Sheets!';
-            }
-            
-            this.showToast(message, 'success');
-        } catch (error) {
-            console.error('Save all sessions error:', error);
-            this.showToast(`Sessions saved locally (Sheets error: ${error.message})`, 'warning');
-        }
-    } else {
-        let message = '';
-        if (hasAMData && hasPMData) {
-            message = 'Both AM and PM sessions saved successfully!';
-        } else if (hasAMData) {
-            message = 'AM session saved successfully!';
-        } else {
-            message = 'PM session saved successfully!';
-        }
-        this.showToast(message, 'success');
-    }
-}
 
             clearAttendanceForm() {
                 if (confirm('Clear all entries for current session?')) {
@@ -2012,7 +2038,7 @@ async saveAllSessions() {
                 container.insertAdjacentHTML('beforeend', html);
             }
 
-       async saveTerms() {
+            async saveTerms() {
                 const termInputs = document.querySelectorAll('#terms-container .class-input-group');
                 const newTerms = [];
                 
@@ -2036,11 +2062,9 @@ async saveAllSessions() {
                     return;
                 }
                 
-                // Save locally first
                 this.terms = newTerms;
-                sessionStorage.setItem('gams_terms', JSON.stringify(this.terms));
+                localStorage.setItem('gams_terms', JSON.stringify(this.terms));
                 
-                // Save to Google Sheets if configured
                 if (this.settings.webAppUrl) {
                     try {
                         this.showToast('Saving terms to Google Sheets...', 'info');
@@ -2057,7 +2081,7 @@ async saveAllSessions() {
 
             resetTerms() {
                 if (confirm('Reset terms to default values?')) {
-                    sessionStorage.removeItem('gams_terms');
+                    localStorage.removeItem('gams_terms');
                     this.loadData();
                     this.loadTermsForm();
                     this.showToast('Terms reset to default', 'warning');
@@ -2069,6 +2093,7 @@ async saveAllSessions() {
                     classes: this.classes,
                     attendanceRecords: this.attendanceRecords,
                     terms: this.terms,
+                    settings: this.settings,
                     exportDate: new Date().toISOString()
                 };
                 
@@ -2094,10 +2119,12 @@ async saveAllSessions() {
                         if (data.classes) this.classes = data.classes;
                         if (data.attendanceRecords) this.attendanceRecords = data.attendanceRecords;
                         if (data.terms) this.terms = data.terms;
+                        if (data.settings) this.settings = data.settings;
                         
-                        sessionStorage.setItem('gams_classes', JSON.stringify(this.classes));
-                        sessionStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
-                        sessionStorage.setItem('gams_terms', JSON.stringify(this.terms));
+                        localStorage.setItem('gams_classes', JSON.stringify(this.classes));
+                        localStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
+                        localStorage.setItem('gams_terms', JSON.stringify(this.terms));
+                        localStorage.setItem('gams_settings', JSON.stringify(this.settings));
                         
                         this.showToast('Data imported successfully!', 'success');
                     } catch (error) {
@@ -2110,74 +2137,25 @@ async saveAllSessions() {
             clearAttendanceData() {
                 if (confirm('Are you sure you want to clear all attendance history?')) {
                     this.attendanceRecords = [];
-                    sessionStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
+                    localStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
                     this.showToast('Attendance history cleared', 'warning');
                 }
             }
 
             initSettings() {
-    const webAppUrlInput = document.getElementById('webapp-url');
-    const sheetIdInput = document.getElementById('sheet-id');
+                if (this.settings.webAppUrl) document.getElementById('webapp-url').value = this.settings.webAppUrl;
+                if (this.settings.sheetId) document.getElementById('sheet-id').value = this.settings.sheetId;
 
-    // 🟢 Load previously saved settings from localStorage (persistent)
-    const savedSettings = localStorage.getItem('gams_settings');
-    if (savedSettings) {
-        this.settings = JSON.parse(savedSettings);
-        webAppUrlInput.value = this.settings.webAppUrl || '';
-        sheetIdInput.value = this.settings.sheetId || '';
-    }
-
-    ['save-settings-btn', 'test-connection-btn', 'setup-sheets-btn'].forEach(btnId => {
-        const btn = document.getElementById(btnId);
-        const newBtn = btn.cloneNode(true);
-        btn.replaceWith(newBtn);
-
-        // 🟢 Save Settings permanently
-        if (btnId === 'save-settings-btn') {
-            newBtn.addEventListener('click', () => {
-                const webAppUrl = webAppUrlInput.value.trim();
-                const sheetId = sheetIdInput.value.trim();
-
-                if (!webAppUrl) {
-                    this.showToast('Please enter your Web App URL', 'error');
-                    return;
-                }
-
-                this.settings = { webAppUrl, sheetId };
-                localStorage.setItem('gams_settings', JSON.stringify(this.settings)); // persistent storage
-
-                this.showToast('Settings saved permanently!', 'success');
-            });
-        }
-
-        // 🧪 Test connection button
-        if (btnId === 'test-connection-btn') {
-            newBtn.addEventListener('click', async () => {
-                if (!this.settings.webAppUrl) {
-                    this.showToast('Please save your Web App URL first', 'error');
-                    return;
-                }
-                try {
-                    const res = await this.makeRequest('testConnection');
-                    if (res.success) {
-                        this.showToast('Connection successful!', 'success');
-                    } else {
-                        this.showToast('Connection failed. Check URL or permissions.', 'error');
-                    }
-                } catch (err) {
-                    this.showToast(`Error: ${err.message}`, 'error');
-                }
-            });
-        }
-
-        // ⚙️ Setup Sheets button
-        if (btnId === 'setup-sheets-btn') {
-            newBtn.addEventListener('click', () => {
-                this.showToast('Initializing Google Sheets...', 'info');
-            });
-        }
-    });
-}
+                ['save-settings-btn', 'test-connection-btn', 'setup-sheets-btn'].forEach(btnId => {
+                    const btn = document.getElementById(btnId);
+                    const newBtn = btn.cloneNode(true);
+                    btn.replaceWith(newBtn);
+                    
+                    if (btnId === 'save-settings-btn') newBtn.addEventListener('click', () => this.saveSettings());
+                    if (btnId === 'test-connection-btn') newBtn.addEventListener('click', () => this.testConnection());
+                    if (btnId === 'setup-sheets-btn') newBtn.addEventListener('click', () => this.setupSheets());
+                });
+            }
 
             saveSettings() {
                 const webAppUrl = document.getElementById('webapp-url').value;
@@ -2188,9 +2166,12 @@ async saveAllSessions() {
                     return;
                 }
                 
-                this.settings = { webAppUrl: webAppUrl.trim(), sheetId: sheetId.trim() };
-                sessionStorage.setItem('gams_settings', JSON.stringify(this.settings));
-                this.showToast('Settings saved!', 'success');
+                this.settings = { 
+                    webAppUrl: webAppUrl.trim(), 
+                    sheetId: sheetId.trim() 
+                };
+                localStorage.setItem('gams_settings', JSON.stringify(this.settings));
+                this.showToast('Settings saved to localStorage!', 'success');
             }
 
             async testConnection() {
@@ -2206,7 +2187,7 @@ async saveAllSessions() {
                     if (response.success) {
                         this.showToast('✅ Connected to Google Sheets successfully!', 'success');
                         this.classes = response.classes;
-                        sessionStorage.setItem('gams_classes', JSON.stringify(this.classes));
+                        localStorage.setItem('gams_classes', JSON.stringify(this.classes));
                     } else {
                         throw new Error(response.error || 'Connection failed');
                     }
@@ -2289,7 +2270,6 @@ async saveAllSessions() {
                 if (!this.settings.webAppUrl) return;
                 
                 try {
-                    // Save each class attendance record individually
                     const savePromises = [];
                     
                     Object.keys(attendanceData).forEach(classId => {
@@ -2322,7 +2302,6 @@ async saveAllSessions() {
                                         throw new Error(data.error || 'Failed to save attendance');
                                     }
                                     
-                                    // Update local record
                                     const record = {
                                         date,
                                         session: session.toLowerCase(),
@@ -2356,11 +2335,9 @@ async saveAllSessions() {
                         throw new Error('No attendance data to save');
                     }
                     
-                    // Wait for all saves to complete
                     await Promise.all(savePromises);
                     
-                    // Save updated records locally
-                    sessionStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
+                    localStorage.setItem('gams_attendance', JSON.stringify(this.attendanceRecords));
                     
                     return { success: true, message: `${savePromises.length} records saved` };
                 } catch (error) {
@@ -2409,7 +2386,7 @@ async saveAllSessions() {
                 toast.className = `toast ${type}`;
                 toast.innerHTML = `
                     <span>${message}</span>
-                    <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: inherit;">✅</button>
+                    <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: inherit;">✕</button>
                 `;
                 
                 toastContainer.appendChild(toast);
@@ -2423,15 +2400,3 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
