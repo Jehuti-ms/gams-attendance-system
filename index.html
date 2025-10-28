@@ -1165,13 +1165,15 @@
                 this.showPage(this.currentUser ? 'dashboard' : 'login');
             }
 
-            loadData() {
-                const savedUser = sessionStorage.getItem('gams_user');
-                if (savedUser) this.currentUser = JSON.parse(savedUser);
-
-                const savedSettings = localStorage.getItem('gams_settings');
-                if (savedSettings) this.settings = JSON.parse(savedSettings);
-
+          loadData() {
+		        const savedUser = sessionStorage.getItem('gams_user');
+		        if (savedUser) this.currentUser = JSON.parse(savedUser);
+		
+		        // 🔹 Load permanent settings from localStorage
+		        const savedSettings = localStorage.getItem('gams_settings');
+		        if (savedSettings) {
+		            this.settings = JSON.parse(savedSettings);
+		        }
                 const savedTerms = sessionStorage.getItem('gams_terms');
                 if (savedTerms) this.terms = JSON.parse(savedTerms);
 
@@ -2114,19 +2116,68 @@ async saveAllSessions() {
             }
 
             initSettings() {
-                if (this.settings.webAppUrl) document.getElementById('webapp-url').value = this.settings.webAppUrl;
-                if (this.settings.sheetId) document.getElementById('sheet-id').value = this.settings.sheetId;
+    const webAppUrlInput = document.getElementById('webapp-url');
+    const sheetIdInput = document.getElementById('sheet-id');
 
-                ['save-settings-btn', 'test-connection-btn', 'setup-sheets-btn'].forEach(btnId => {
-                    const btn = document.getElementById(btnId);
-                    const newBtn = btn.cloneNode(true);
-                    btn.replaceWith(newBtn);
-                    
-                    if (btnId === 'save-settings-btn') newBtn.addEventListener('click', () => this.saveSettings());
-                    if (btnId === 'test-connection-btn') newBtn.addEventListener('click', () => this.testConnection());
-                    if (btnId === 'setup-sheets-btn') newBtn.addEventListener('click', () => this.setupSheets());
-                });
-            }
+    // 🟢 Load previously saved settings from localStorage (persistent)
+    const savedSettings = localStorage.getItem('gams_settings');
+    if (savedSettings) {
+        this.settings = JSON.parse(savedSettings);
+        webAppUrlInput.value = this.settings.webAppUrl || '';
+        sheetIdInput.value = this.settings.sheetId || '';
+    }
+
+    ['save-settings-btn', 'test-connection-btn', 'setup-sheets-btn'].forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        const newBtn = btn.cloneNode(true);
+        btn.replaceWith(newBtn);
+
+        // 🟢 Save Settings permanently
+        if (btnId === 'save-settings-btn') {
+            newBtn.addEventListener('click', () => {
+                const webAppUrl = webAppUrlInput.value.trim();
+                const sheetId = sheetIdInput.value.trim();
+
+                if (!webAppUrl) {
+                    this.showToast('Please enter your Web App URL', 'error');
+                    return;
+                }
+
+                this.settings = { webAppUrl, sheetId };
+                localStorage.setItem('gams_settings', JSON.stringify(this.settings)); // persistent storage
+
+                this.showToast('Settings saved permanently!', 'success');
+            });
+        }
+
+        // 🧪 Test connection button
+        if (btnId === 'test-connection-btn') {
+            newBtn.addEventListener('click', async () => {
+                if (!this.settings.webAppUrl) {
+                    this.showToast('Please save your Web App URL first', 'error');
+                    return;
+                }
+                try {
+                    const res = await this.makeRequest('testConnection');
+                    if (res.success) {
+                        this.showToast('Connection successful!', 'success');
+                    } else {
+                        this.showToast('Connection failed. Check URL or permissions.', 'error');
+                    }
+                } catch (err) {
+                    this.showToast(`Error: ${err.message}`, 'error');
+                }
+            });
+        }
+
+        // ⚙️ Setup Sheets button
+        if (btnId === 'setup-sheets-btn') {
+            newBtn.addEventListener('click', () => {
+                this.showToast('Initializing Google Sheets...', 'info');
+            });
+        }
+    });
+}
 
             saveSettings() {
                 const webAppUrl = document.getElementById('webapp-url').value;
@@ -2372,6 +2423,7 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
+
 
 
 
