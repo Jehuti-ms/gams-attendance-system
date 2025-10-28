@@ -1169,7 +1169,7 @@
                 const savedUser = sessionStorage.getItem('gams_user');
                 if (savedUser) this.currentUser = JSON.parse(savedUser);
 
-                const savedSettings = sessionStorage.getItem('gams_settings');
+                const savedSettings = localStorage.getItem('gams_settings');
                 if (savedSettings) this.settings = JSON.parse(savedSettings);
 
                 const savedTerms = sessionStorage.getItem('gams_terms');
@@ -2372,6 +2372,7 @@ async saveAllSessions() {
     </script>
 </body>
 </html>
+
 
 
 
